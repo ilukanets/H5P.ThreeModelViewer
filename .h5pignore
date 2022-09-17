@@ -1,0 +1,11 @@
+.idea
+.git
+.gitignore
+.h5pignore
+node_modules
+src
+package-lock.json
+package.json
+webpack.config.js
+dist/main.js.LICENSE.txt
+README.MD
