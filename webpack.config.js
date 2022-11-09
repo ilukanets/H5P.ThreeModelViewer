@@ -20,7 +20,9 @@ module.exports = {
           },
           'css-loader'
         ]
-      }
+      },
+      { test: /\.vert$/, use: 'raw-loader' },
+      { test: /\.frag$/, use: 'raw-loader' }
     ]
   },
   optimization: {

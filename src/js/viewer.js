@@ -1,6 +1,0 @@
-
-
-class ThreeModelViewer {
-  constructor() {
-  }
-}
