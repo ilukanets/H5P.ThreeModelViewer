@@ -15,6 +15,8 @@ import {
 import vert from './three-vignette.vert';
 import frag from './three-vignette.frag';
 
+debugger;
+
 function createBackground (opt) {
   opt = opt || {}
   var geometry = opt.geometry || new PlaneGeometry(2, 2, 1)
