@@ -1,5 +1,5 @@
 {
-  "name": "h5peditor.rbmodelloader",
+  "name": "h5p.threemodelviewer",
   "version": "1.0.0",
   "description": "Widget for 3d models loading",
   "private": true,
