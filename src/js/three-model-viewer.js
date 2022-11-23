@@ -1,3 +1,4 @@
+import 'material-icons/iconfont/outlined.css';
 import { Viewer } from './viewer/viewer';
 
 // noinspection JSUnresolvedVariable
@@ -16,10 +17,17 @@ const ThreeModelViewer = (function(H5P, $) {
       this.options = options;
 
       this.viewerEl = document.createElement('div');
-      this.viewerEl.classList.add('h5p-three-model-viewer');
+      this.viewerEl.classList.add('h5p-3d-viewer');
 
       this.spinnerEl = document.createElement('div');
-      this.spinnerEl.classList.add('h5p-three-model-spinner');
+      this.spinnerEl.innerHTML = `
+          <div class="spinner">
+            <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                <circle fill="none" r="23" cx="24" cy="24"/>
+            </svg>
+          </div>
+        `;
+      this.spinnerEl.classList.add('h5p-3d-viewer-spinner');
 
       this.hideSpinner();
 
@@ -37,8 +45,10 @@ const ThreeModelViewer = (function(H5P, $) {
      * @param  {string} rootPath
      * @param  {Map<string, File>} fileMap
      */
-    view (rootFile, rootPath, fileMap) {
+    view(rootFile, rootPath, fileMap) {
       if (this.viewer) this.viewer.clear();
+
+      this.showSpinner();
 
       const viewer = this.viewer || this.createViewer();
 
@@ -54,6 +64,9 @@ const ThreeModelViewer = (function(H5P, $) {
 
       viewer
           .load(fileURL, rootPath, fileMap)
+          .then(() => {
+            this.hideSpinner();
+          })
           .catch((e) => this.onError(e))
           .then((gltf) => {
             cleanup();
@@ -64,8 +77,8 @@ const ThreeModelViewer = (function(H5P, $) {
     /**
      * @param  {Error} error
      */
-    onError (error) {
-      let message = (error||{}).message || error.toString();
+    onError(error) {
+      let message = (error || {}).message || error.toString();
 
       if (message.match(/ProgressEvent/)) {
         message = 'Unable to retrieve this file. Check JS console and browser network tab.';
@@ -89,11 +102,11 @@ const ThreeModelViewer = (function(H5P, $) {
       return this.viewer;
     }
 
-    showSpinner () {
+    showSpinner() {
       this.spinnerEl.style.display = '';
     }
 
-    hideSpinner () {
+    hideSpinner() {
       this.spinnerEl.style.display = 'none';
     }
   }

@@ -4,6 +4,7 @@ import {
   AxesHelper,
   Box3,
   DirectionalLight,
+  GridHelper,
   HemisphereLight,
   LinearEncoding,
   LinearToneMapping,
@@ -12,7 +13,7 @@ import {
   PerspectiveCamera,
   PMREMGenerator,
   REVISION,
-  Scene,
+  Scene, SkeletonHelper,
   sRGBEncoding,
   Vector3,
   WebGLRenderer
@@ -25,6 +26,7 @@ import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module';
+import { TWEEN } from 'three/examples/jsm/libs/tween.module.min.js';
 
 import { createBackground } from '../lib/three-vignette';
 
@@ -35,6 +37,7 @@ const KTX2_LOADER = new KTX2Loader(MANAGER).setTranscoderPath(`${THREE_PATH}/exa
 
 const DEFAULT_CAMERA = '[default]';
 const IS_IOS = isIOS();
+const ZOOM_FACTOR = 1.2;
 
 const Preset = { ASSET_GENERATOR: 'assetgenerator' };
 
@@ -48,6 +51,8 @@ export class Viewer {
     this.mixer = null;
     this.clips = [];
 
+    this.isFullscreen = false;
+
     // @todo: Sanitize state object.
     this.state = {
       environment: options.preset === Preset.ASSET_GENERATOR
@@ -59,7 +64,7 @@ export class Viewer {
       camera: DEFAULT_CAMERA,
       wireframe: false,
       skeleton: false,
-      grid: false,
+      grid: options.grid || false,
 
       // Lights
       punctualLights: true,
@@ -70,8 +75,9 @@ export class Viewer {
       ambientColor: 0xFFFFFF,
       directIntensity: 0.8 * Math.PI,
       directColor: 0xFFFFFF,
-      bgColor1: '#bbbbbb',
-      bgColor2: '#ffffff'
+      bgColor: options.bgColor ?? 0xFFFFFF,
+      bgColor1: options.bgColor1 ?? '#FFFFFF',
+      bgColor2: options.bgColor2 ?? '#F6F5F5',
     };
 
     // Create Scene.
@@ -83,13 +89,14 @@ export class Viewer {
         : 60;
     this.defaultCamera = new PerspectiveCamera(fov, el.clientWidth / el.clientHeight, 0.01, 1000);
     this.activeCamera = this.defaultCamera;
+
     this.scene.add(this.defaultCamera);
 
     // Create renderer.
     this.renderer = window.renderer = new WebGLRenderer({ antialias: true });
     this.renderer.physicallyCorrectLights = true;
     this.renderer.outputEncoding = sRGBEncoding;
-    this.renderer.setClearColor(0xf0f0f0);
+    this.renderer.setClearColor(this.state.bgColor);
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(el.clientWidth, el.clientHeight);
 
@@ -103,13 +110,15 @@ export class Viewer {
     this.controls.autoRotateSpeed = -10;
     this.controls.screenSpacePanning = true;
 
-    this.vignette = createBackground({
-      aspect: this.defaultCamera.aspect,
-      grainScale: IS_IOS ? 0 : 0.001, // mattdesl/three-vignette-background#1
-      colors: [this.state.bgColor1, this.state.bgColor2]
-    });
-    this.vignette.name = 'Vignette';
-    this.vignette.renderOrder = -1;
+    if (this.options.vignette) {
+      this.vignette = createBackground({
+        aspect: this.defaultCamera.aspect,
+        grainScale: IS_IOS ? 0 : 0.001, // mattdesl/three-vignette-background#1
+        colors: [this.state.bgColor1, this.state.bgColor2]
+      });
+      this.vignette.name = 'Vignette';
+      this.vignette.renderOrder = -1;
+    }
 
     this.el.appendChild(this.renderer.domElement);
 
@@ -141,15 +150,17 @@ export class Viewer {
 
     this.controls.update();
 
+    TWEEN.update();
     this.mixer && this.mixer.update(dt);
+
     this.render();
 
     this.prevTime = time;
   }
 
   render() {
-
     this.renderer.render(this.scene, this.activeCamera);
+
     if (this.state.grid) {
       this.axesCamera.position.copy(this.defaultCamera.position)
       this.axesCamera.lookAt(this.axesScene.position)
@@ -158,12 +169,11 @@ export class Viewer {
   }
 
   resize() {
-
-    const { clientHeight, clientWidth } = this.el.parentElement;
+    let { clientHeight, clientWidth } = !this.isFullscreen ? this.el.parentElement : document.documentElement;
 
     this.defaultCamera.aspect = clientWidth / clientHeight;
     this.defaultCamera.updateProjectionMatrix();
-    this.vignette.style({ aspect: this.defaultCamera.aspect });
+    this.vignette && this.vignette.style({ aspect: this.defaultCamera.aspect });
     this.renderer.setSize(clientWidth, clientHeight);
 
     this.axesCamera.aspect = this.axesDiv.clientWidth / this.axesDiv.clientHeight;
@@ -262,10 +272,13 @@ export class Viewer {
     } else {
       this.defaultCamera.position.copy(center);
       this.defaultCamera.position.x += size / 2.0;
-      this.defaultCamera.position.y += size / 5.0;
+      this.defaultCamera.position.y += size / 3.0;
       this.defaultCamera.position.z += size / 2.0;
       this.defaultCamera.lookAt(center);
     }
+
+    // Save camera start position.
+    this.activeCameraPosition = new Vector3().copy(this.defaultCamera.position);
 
     this.setCamera(DEFAULT_CAMERA);
 
@@ -418,16 +431,16 @@ export class Viewer {
     const environment = environments.filter((entry) => entry.name === this.state.environment)[0];
 
     this.getCubeMapTexture(environment).then(({ envMap }) => {
-
-      if ((!envMap || !this.state.background) && this.activeCamera === this.defaultCamera) {
-        this.scene.add(this.vignette);
-      } else {
-        this.scene.remove(this.vignette);
+      if (this.vignette) {
+        if ((!envMap || !this.state.background) && this.activeCamera === this.defaultCamera) {
+          this.scene.add(this.vignette);
+        } else {
+          this.scene.remove(this.vignette);
+        }
       }
 
       this.scene.environment = envMap;
       this.scene.background = this.state.background ? envMap : null;
-
     });
   }
 
@@ -479,6 +492,7 @@ export class Viewer {
       if (this.state.grid) {
         this.gridHelper = new GridHelper();
         this.axesHelper = new AxesHelper();
+        this.axesHelper.setColors();
         this.axesHelper.renderOrder = 999;
         this.axesHelper.onBeforeRender = (renderer) => renderer.clearDepth();
         this.scene.add(this.gridHelper);
@@ -494,7 +508,7 @@ export class Viewer {
   }
 
   updateBackground() {
-    this.vignette.style({ colors: [this.state.bgColor1, this.state.bgColor2] });
+    this.vignette && this.vignette.style({ colors: [this.state.bgColor1, this.state.bgColor2] });
   }
 
   /**
@@ -525,42 +539,62 @@ export class Viewer {
   }
 
   addGUI() {
-    this.zoomInEl = document.createElement('div');
-    this.zoomInEl.classList.add('tmv-control-zoom-in');
-    this.zoomInEl.innerText = 'Zoom In';
+    this.$controls = H5P.jQuery('<div/>', {
+      'class': 'h5p-3d-viewer-controls'
+    }).appendTo(this.el);
 
-    this.zoomInEl.addEventListener('click', (event) => {
-      event.preventDefault();
-
-      // @todo: Zoom in
+    this.createActionButton({
+      title: 'Toggle fullscreen',
+      icon: 'fullscreen',
+      action: 'fullscreen',
+      callback: this.toggleFullscreen.bind(this),
     });
 
-    this.zoomOutEl = document.createElement('div');
-    this.zoomOutEl.classList.add('tmv-control-zoom-in');
-    this.zoomOutEl.innerText = 'Zoom Out';
-
-    this.zoomOutEl.addEventListener('click', (event) => {
-      event.preventDefault();
-
-      // @todo: zoom out
+    this.createActionButton({
+      title: 'Zoom In',
+      icon: 'add',
+      action: 'zoom-in',
+      callback: this.zoomIn.bind(this),
     });
 
-    this.zoomResetEl = document.createElement('div');
-    this.zoomResetEl.classList.add('tmv-control-zoom-out');
-    this.zoomResetEl.innerText = 'Zoom reset';
-
-    this.zoomResetEl.addEventListener('click', (event) => {
-      event.preventDefault();
-
-      // @todo: reset to default.
+    this.createActionButton({
+      title: 'Zoom Out',
+      icon: 'remove',
+      action: 'zoom-out',
+      callback: this.zoomOut.bind(this),
     });
 
-    this.el.appendChild(this.zoomInEl);
-    this.el.appendChild(this.zoomOutEl);
-    this.el.appendChild(this.zoomResetEl);
+    this.createActionButton({
+      title: 'Reset',
+      icon: 'center_focus_strong',
+      action: 'reset',
+      callback: this.resetCamera.bind(this),
+    });
+
+    this.el.onfullscreenchange = (event) => {
+      this.isFullscreen = !this.isFullscreen;
+    }
   }
 
   updateGUI() {
+  }
+
+  createActionButton(data) {
+    const { title, icon, action, callback } = data;
+    const $button = H5P.jQuery('<button/>', {
+      'title': title,
+      'class': `h5p-3d-viewer-control ${action}`,
+      'html': `<i class="material-icons-outlined" aria-hidden="true">${icon}</i>`,
+      'click': (event) => {
+        event.preventDefault();
+
+        if (typeof callback === 'function') {
+          callback();
+        }
+      }
+    });
+
+    $button.appendTo(this.$controls);
   }
 
   clear() {
@@ -583,6 +617,70 @@ export class Viewer {
         }
       }
     });
+  }
+
+  // UI API methods
+  zoomIn() {
+    this.controls.enabled = false;
+
+    new TWEEN.Tween(this.activeCamera.position)
+        .to(new Vector3().copy(this.activeCamera.position).divideScalar(ZOOM_FACTOR), 400)
+        .onComplete(() => {
+          this.controls.enabled = true;
+        })
+        .easing(TWEEN.Easing.Cubic.InOut)
+        .start();
+  }
+
+  zoomOut() {
+    this.controls.enabled = false;
+
+    new TWEEN.Tween(this.activeCamera.position)
+        .to(new Vector3().copy(this.activeCamera.position).multiplyScalar(ZOOM_FACTOR), 400)
+        .easing(TWEEN.Easing.Cubic.InOut)
+        .onComplete(() => {
+          this.controls.enabled = true;
+        })
+        .start();
+  }
+
+  resetCamera() {
+    this.controls.enabled = false;
+
+    // @todo: Rotate before scaling.
+    new TWEEN.Tween(this.activeCamera.position)
+        .to(this.activeCameraPosition, 400)
+        .onComplete(() => {
+          this.controls.enabled = true;
+        })
+        .easing(TWEEN.Easing.Cubic.InOut)
+        .start();
+  }
+
+  toggleFullscreen() {
+    if (!document.fullscreenElement &&    // alternative standard method
+        !document.mozFullScreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {  // current working methods
+      if (this.el.requestFullscreen) {
+        this.el.requestFullscreen();
+      } else if (this.el.msRequestFullscreen) {
+        this.el.msRequestFullscreen();
+      } else if (this.el.mozRequestFullScreen) {
+        this.el.mozRequestFullScreen();
+      } else if (this.el.webkitRequestFullscreen) {
+        this.el.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+      } else if (document.mozCancelFullScreen) {
+        document.mozCancelFullScreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      }
+    }
+
   }
 }
 

@@ -10,6 +10,13 @@ module.exports = {
         use: 'babel-loader'
       },
       {
+        test: /\.(glsl|frag|vert)$/,
+        use: [
+          require.resolve('raw-loader'),
+          require.resolve('glslify-loader')
+        ]
+      },
+      {
         test: /\.css$/,
         use: [
           {
@@ -20,10 +27,6 @@ module.exports = {
           },
           'css-loader'
         ]
-      },
-      {
-        test: /\.(vert|frag)$/i,
-        use: 'raw-loader',
       }
     ]
   },

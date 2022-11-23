@@ -1,4 +1,127 @@
-.h5p-three-model-viewer {
+.h5p-3d-viewer {
   width: 100%;
   height: 100%;
+  position: relative;
+}
+
+.h5p-3d-viewer:fullscreen canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.spinner {
+  display: inline-block;
+  width: 48px;
+  height: 48px;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/** SVG */
+.spinner svg {
+  animation: spinner-rotate 1.4s linear infinite;
+}
+
+/** Circle */
+.spinner circle {
+  stroke-dasharray: 144px;
+  stroke-dashoffset: 0;
+  transform-origin: center;
+  animation: spinner-dash 1.4s ease-in-out infinite;
+  stroke-width: 2px;
+  stroke-linecap: round;
+}
+
+@keyframes spinner-rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(270deg);
+  }
+}
+
+@keyframes spinner-dash {
+  0% {
+    stroke-dashoffset: 144px;
+  }
+  50% {
+    stroke-dashoffset: 36px;
+    transform: rotate(135deg);
+  }
+  100% {
+    stroke-dashoffset: 144px;
+    transform: rotate(450deg);
+  }
+}
+
+.axes {
+  width: 100px;
+  height: 100px;
+  margin: 20px;
+  padding: 0;
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.h5p-3d-viewer-controls {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.h5p-3d-viewer-control {
+  -webkit-appearance: none;
+  appearance: none;
+  background: #eaeced;
+  border: 2px solid transparent;
+  border-radius: 500rem;
+  box-sizing: border-box;
+  -webkit-box-sizing: border-box;
+  color: #212222;
+  cursor: pointer;
+  display: inline-block;
+  font-size: 16px;
+  line-height: 1.5;
+  margin: 0;
+  width: 3rem;
+  height: 3rem;
+  overflow: visible;
+  padding: 0;
+  text-align: center;
+  text-decoration: none;
+  text-transform: none;
+  transition: all .15s ease-in-out;
+  -webkit-transition: all .15s ease-in-out;
+  -o-transition: all .15s ease-in-out;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  vertical-align: middle;
+}
+
+.h5p-3d-viewer-control:hover,
+.h5p-3d-viewer-control:focus,
+.h5p-3d-viewer-control:active {
+  background-color: #dce0e1;
+  outline: none;
+}
+
+.h5p-3d-viewer-control + .h5p-3d-viewer-control {
+  margin-top: 8px;
+}
+
+.h5p-3d-viewer-control .material-icons-outlined {
+  vertical-align: middle;
+}
+
+canvas:focus {
+  box-shadow: none !important;
+  outline: none !important;
 }
